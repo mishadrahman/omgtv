@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "queue_entry": {
+      "title": "Queue Entry",
+      "description": "A user waiting in the matchmaking queue.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "matched"] },
+        "sessionId": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["uid", "status", "createdAt"]
+    },
+    "session": {
+      "title": "Chat Session",
+      "description": "An active chat session between two matched users.",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["active", "ended"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["participants", "status", "createdAt"]
+    },
+    "message": {
+      "title": "Chat Message",
+      "description": "A message sent within a chat session.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["senderId", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/queue/{userId}": {
+      "schema": { "$ref": "#/entities/queue_entry" },
+      "description": "Stores users currently waiting for a match."
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/session" },
+      "description": "Stores active or ended chat sessions between two users."
+    },
+    "/sessions/{sessionId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/message" },
+      "description": "Stores messages for a given chat session."
+    }
+  }
+}

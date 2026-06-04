@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic helpers
+    function isSignedIn() { return request.auth != null; }
+    function existing() { return resource.data; }
+    function incoming() { return request.resource.data; }
+
+    function isValidId(id) { 
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // queue_entry validation
+    function isValidQueueEntry(data) {
+      return data.keys().hasAll(['uid', 'status', 'createdAt']) &&
+        (data.keys().size() == 3 || data.keys().size() == 4) &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.status is string && data.status in ['waiting', 'matched'] &&
+        (data.get('sessionId', '') is string) &&
+        data.createdAt is timestamp;
+    }
+
+    match /queue/{userId} {
+      allow read: if isSignedIn() && isValidId(userId);
+
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        userId == request.auth.uid &&
+        isValidQueueEntry(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().status == 'waiting' &&
+        !('sessionId' in incoming()) &&
+        incoming().createdAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidQueueEntry(incoming()) &&
+        (
+          // User cancels or updates their own queue entry
+          (userId == request.auth.uid && incoming().uid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+          // Another user matches with them
+          (userId != request.auth.uid && existing().status == 'waiting' && incoming().status == 'matched' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'sessionId']))
+        );
+
+      allow delete: if isSignedIn() && isValidId(userId) && userId == request.auth.uid;
+    }
+
+    // session validation
+    function isValidSession(data) {
+      return data.keys().hasAll(['participants', 'status', 'createdAt']) &&
+        data.keys().size() == 3 &&
+        data.participants is list && data.participants.size() == 2 &&
+        data.participants[0] is string && data.participants[0].size() > 0 &&
+        data.participants[1] is string && data.participants[1].size() > 0 &&
+        data.status is string && data.status in ['active', 'ended'] &&
+        data.createdAt is timestamp;
+    }
+
+    match /sessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) && request.auth.uid in existing().participants;
+      
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participants;
+
+      allow create: if isSignedIn() && 
+        isValidId(sessionId) && 
+        isValidSession(incoming()) &&
+        request.auth.uid in incoming().participants &&
+        incoming().status == 'active' &&
+        incoming().createdAt == request.time;
+
+      allow update: if isSignedIn() && 
+        isValidId(sessionId) && 
+        request.auth.uid in existing().participants &&
+        isValidSession(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+        incoming().participants == existing().participants && 
+        incoming().createdAt == existing().createdAt;
+    }
+
+    // message validation
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderId', 'text', 'createdAt']) &&
+        data.keys().size() == 3 &&
+        data.senderId is string && data.senderId.size() > 0 && data.senderId.size() <= 128 &&
+        data.text is string && data.text.size() > 0 && data.text.size() <= 2000 &&
+        data.createdAt is timestamp;
+    }
+
+    match /sessions/{sessionId}/messages/{messageId} {
+      allow read: if isSignedIn() && 
+        isValidId(sessionId) && 
+        isValidId(messageId) &&
+        request.auth.uid in get(/databases/$(database)/documents/sessions/$(sessionId)).data.participants;
+      
+      allow list: if isSignedIn() && 
+        isValidId(sessionId) &&
+        request.auth.uid in get(/databases/$(database)/documents/sessions/$(sessionId)).data.participants;
+
+      allow create: if isSignedIn() && 
+        isValidId(sessionId) && 
+        isValidId(messageId) &&
+        isValidMessage(incoming()) &&
+        incoming().senderId == request.auth.uid &&
+        request.auth.uid in get(/databases/$(database)/documents/sessions/$(sessionId)).data.participants &&
+        get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'active' &&
+        incoming().createdAt == request.time;
+    }
+  }
+}
