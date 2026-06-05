@@ -1,75 +1,99 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, limit, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, deleteDoc, runTransaction } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { OperationType, handleFirestoreError } from '../lib/firebase-utils';
+
+export type MatchType = 'text' | 'video';
 
 export function useMatchmaking() {
   const [isSearching, setIsSearching] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const unsubscribeQueue = useRef<(() => void) | null>(null);
+  const previousMatchUid = useRef<string | null>(null);
 
-  const startSearch = async () => {
+  const startSearch = async (matchType: MatchType = 'video') => {
     if (!auth.currentUser) return;
     const myUid = auth.currentUser.uid;
     setIsSearching(true);
     setActiveSessionId(null);
 
     const queueRef = collection(db, 'queue');
-    const q = query(queueRef, where('status', '==', 'waiting'), limit(5));
+    const q = query(
+      queueRef, 
+      where('status', '==', 'waiting'),
+      where('matchType', '==', matchType),
+      limit(10)
+    );
 
     try {
       const snapshot = await getDocs(q);
-      let matchUid = null;
-      let matchedDocRef = null;
+      
+      let matchedSuccessfully = false;
 
+      // Try to match with someone using a transaction to avoid race conditions
       for (const docSnap of snapshot.docs) {
-        if (docSnap.id !== myUid) {
-          matchUid = docSnap.id;
-          matchedDocRef = docSnap.ref;
-          break;
+        if (docSnap.id === myUid || docSnap.id === previousMatchUid.current) continue;
+        
+        const candidateUid = docSnap.id;
+        const candidateRef = docSnap.ref;
+        const newSessionId = doc(collection(db, 'sessions')).id;
+        
+        try {
+          await runTransaction(db, async (transaction) => {
+            const candidateDoc = await transaction.get(candidateRef);
+            if (!candidateDoc.exists()) {
+              throw new Error("Document does not exist!");
+            }
+            const data = candidateDoc.data();
+            if (data.status !== 'waiting') {
+              throw new Error("Already matched");
+            }
+            
+            // Candidate is available!
+            // Create the session
+            const sessionRef = doc(db, 'sessions', newSessionId);
+            transaction.set(sessionRef, {
+              participants: [candidateUid, myUid],
+              matchType: matchType,
+              status: 'active',
+              createdAt: serverTimestamp()
+            });
+
+            // Update candidate
+            transaction.update(candidateRef, {
+              status: 'matched',
+              sessionId: newSessionId
+            });
+          });
+
+          // If transaction succeeds:
+          matchedSuccessfully = true;
+          previousMatchUid.current = candidateUid;
+          setIsSearching(false);
+          setActiveSessionId(newSessionId);
+          break; // break out of the loop
+        } catch (e) {
+          console.log("Transaction failed, candidate taken or error:", e);
+          // Try the next candidate
         }
       }
 
-      if (matchUid && matchedDocRef) {
-        // Found someone!
-        const newSessionId = doc(collection(db, 'sessions')).id;
-        
-        // 1. Create session
-        try {
-          await setDoc(doc(db, 'sessions', newSessionId), {
-            participants: [matchUid, myUid],
-            status: 'active',
-            createdAt: serverTimestamp()
-          });
-        } catch (e) {
-          handleFirestoreError(e, OperationType.CREATE, `sessions/${newSessionId}`, auth);
-        }
-
-        // 2. Update their queue entry
-        try {
-          await updateDoc(matchedDocRef, {
-            status: 'matched',
-            sessionId: newSessionId
-          });
-        } catch (e) {
-          // If update fails (e.g. they were matched by someone else first, or they deleted it),
-          // We can fallback to searching again
-          console.warn("Failed to match with user, they might be gone. Retrying...");
-          // Cleanup session that was created
-          await updateDoc(doc(db, 'sessions', newSessionId), { status: 'ended' });
-          // Retry
-          return startSearch();
-        }
-
-        setIsSearching(false);
-        setActiveSessionId(newSessionId);
-      } else {
+      if (!matchedSuccessfully) {
         // Nobody found, add ourselves to queue
         const myQueueRef = doc(db, 'queue', myUid);
+        
+        // Hard-delete any stuck queue entry
+        try {
+          await deleteDoc(myQueueRef);
+        } catch (e) {
+          // ignore
+        }
+
         try {
           await setDoc(myQueueRef, {
             uid: myUid,
             status: 'waiting',
+            matchType: matchType,
             createdAt: serverTimestamp()
           });
         } catch (e) {
@@ -77,6 +101,11 @@ export function useMatchmaking() {
         }
 
         // Listen for changes
+        if (unsubscribeQueue.current) {
+          unsubscribeQueue.current();
+          unsubscribeQueue.current = null;
+        }
+
         unsubscribeQueue.current = onSnapshot(myQueueRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -85,8 +114,7 @@ export function useMatchmaking() {
               setIsSearching(false);
               setActiveSessionId(data.sessionId);
               
-              // Clean up queue entry (if security rules allow, else we just leave it or let the matcher do it)
-              // We'll let the user delete their own doc since rules allow it.
+              // Clean up queue entry
               deleteDoc(myQueueRef).catch(console.error);
               
               if (unsubscribeQueue.current) {
@@ -130,7 +158,6 @@ export function useMatchmaking() {
   };
 
   useEffect(() => {
-    // Cleanup on unmount
     return () => {
       if (unsubscribeQueue.current) {
         unsubscribeQueue.current();

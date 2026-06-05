@@ -35,5 +35,5 @@ export function useLocalVideo(isCamOn: boolean, isMicOn: boolean) {
     }
   }, [stream, isCamOn, isMicOn]);
 
-  return { localVideoRef, hasVideo: !!stream };
+  return { localVideoRef, localStream: stream, hasVideo: !!stream };
 }

@@ -3,9 +3,10 @@ import { Video, VideoOff, Mic, MicOff, SkipForward, MessageSquare, AlertTriangle
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { auth, loginAnonymously } from './firebase';
-import { useMatchmaking } from './hooks/useMatchmaking';
+import { useMatchmaking, MatchType } from './hooks/useMatchmaking';
 import { useChat } from './hooks/useChat';
 import { useLocalVideo } from './hooks/useLocalVideo';
+import { useWebRTC } from './hooks/useWebRTC';
 import { onAuthStateChanged } from 'firebase/auth';
 
 type AppState = 'landing' | 'searching' | 'chat';
@@ -16,12 +17,18 @@ export default function App() {
   const { isSearching, activeSessionId, startSearch, stopSearch, leaveSession } = useMatchmaking();
   const { messages, sessionInfo, sendMessage, strangerId, messagesEndRef } = useChat(activeSessionId);
   const [messageInput, setMessageInput] = useState('');
+  
+  const [currentMatchType, setCurrentMatchType] = useState<MatchType>('video');
 
   // Local Video Setup
+  const isVideoMatch = currentMatchType === 'video';
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const { localVideoRef, hasVideo } = useLocalVideo(isCamOn, isMicOn);
+  const { localVideoRef, localStream, hasVideo } = useLocalVideo(isVideoMatch && isCamOn, isVideoMatch && isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
+
+  // WebRTC Setup
+  const { remoteVideoRef, hasRemoteVideo } = useWebRTC(isVideoMatch ? activeSessionId : null, localStream);
 
   // Derive app state synchronously
   const appState: AppState = isSearching ? 'searching' : activeSessionId ? 'chat' : 'landing';
@@ -47,30 +54,29 @@ export default function App() {
     if (appState === 'chat' && sessionInfo?.status === 'ended') {
       const autoNext = async () => {
         await leaveSession();
-        await startSearch();
+        await startSearch(currentMatchType);
       };
       autoNext();
     }
-  }, [sessionInfo?.status, appState]);
+  }, [sessionInfo?.status, appState, currentMatchType]);
 
-  const handleStart = async () => {
+  const handleStart = async (type: MatchType) => {
     if (!isAuthReady) return;
-    await startSearch();
+    setCurrentMatchType(type);
+    await startSearch(type);
   };
 
   const handleCancelSearch = async () => {
     await stopSearch();
-    setAppState('landing');
   };
 
   const handleNext = async () => {
     await leaveSession();
-    await startSearch();
+    await startSearch(currentMatchType);
   };
 
   const handleStop = async () => {
     await leaveSession();
-    setAppState('landing');
   };
 
   const handleSend = (e: React.FormEvent) => {
@@ -101,7 +107,7 @@ export default function App() {
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">OMG TV</span>
             </div>
 
-            <div className="text-center space-y-8 max-w-2xl">
+            <div className="text-center space-y-8 max-w-2xl w-full">
               <motion.div
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
@@ -118,7 +124,7 @@ export default function App() {
                 </p>
               </motion.div>
 
-              <div className="pt-8 flex flex-col items-center">
+              <div className="pt-8 flex flex-col items-center w-full">
                 {loginError ? (
                   <div className="bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl p-4 text-sm text-center max-w-lg mb-4">
                     <Shield className="w-5 h-5 mx-auto mb-2 opacity-80" />
@@ -133,15 +139,26 @@ export default function App() {
                   </div>
                 ) : null}
 
-                <Button 
-                  onClick={handleStart}
-                  disabled={!isAuthReady}
-                  className="h-16 px-12 sm:h-20 sm:px-16 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full font-black text-xl sm:text-2xl tracking-tighter text-white shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                  id="btn-start-chat"
-                >
-                  <Video className="w-6 h-6 mr-3" />
-                  {isAuthReady ? "Start Chatting" : (loginError ? "Unavailable" : "Connecting...")}
-                </Button>
+                <div className="flex flex-col gap-4 w-full max-w-sm mx-auto">
+                  <Button 
+                    onClick={() => handleStart('text')}
+                    disabled={!isAuthReady}
+                    variant="outline"
+                    className="h-14 sm:h-16 px-8 rounded-full font-bold text-lg border-white/10 hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
+                  >
+                    <MessageSquare className="w-5 h-5 mr-3 text-cyan-400" />
+                    {isAuthReady ? "Just Messaging" : (loginError ? "Unavailable" : "Connecting...")}
+                  </Button>
+
+                  <Button 
+                    onClick={() => handleStart('video')}
+                    disabled={!isAuthReady}
+                    className="h-16 sm:h-20 px-8 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full font-black text-xl tracking-tighter text-white shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <Video className="w-6 h-6 mr-3" />
+                    {isAuthReady ? "Video Call + Messaging" : (loginError ? "Unavailable" : "Connecting...")}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -179,7 +196,11 @@ export default function App() {
             <div className="z-10 flex flex-col items-center space-y-8">
               <div className="w-32 h-32 rounded-full border border-cyan-400/30 flex items-center justify-center bg-cyan-400/5 relative shadow-[0_0_30px_rgba(34,211,238,0.2)]">
                 <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400/40 animate-[spin_4s_linear_infinite]"></div>
-                <Video className="w-12 h-12 text-cyan-400 animate-pulse" />
+                {isVideoMatch ? (
+                    <Video className="w-12 h-12 text-cyan-400 animate-pulse" />
+                ) : (
+                    <MessageSquare className="w-12 h-12 text-cyan-400 animate-pulse" />
+                )}
               </div>
               
               <div className="text-center">
@@ -226,82 +247,95 @@ export default function App() {
             </header>
 
             {/* Main Content Split */}
-            <main className="flex-1 flex flex-col sm:flex-row p-2 sm:p-6 gap-2 sm:gap-6 overflow-hidden min-h-0">
+            <main className={`flex-1 flex flex-col sm:flex-row p-2 sm:p-6 gap-2 sm:gap-6 overflow-hidden min-h-0 ${!isVideoMatch ? 'max-w-3xl mx-auto w-full' : ''}`}>
               
-              {/* Video Area (Left) */}
-              <div className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-[30vh]">
-                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
-                  <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border border-cyan-400/30 flex items-center justify-center bg-cyan-400/5 relative">
-                    <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400/20 animate-[spin_4s_linear_infinite]"></div>
-                    <Video className="w-8 h-8 sm:w-16 sm:h-16 text-cyan-400 opacity-20" />
+              {/* Video Area (Left) - Only show if it's a video match */}
+              {isVideoMatch && (
+                  <div className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-[30vh]">
+                    {!hasRemoteVideo ? (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border border-cyan-400/30 flex items-center justify-center bg-cyan-400/5 relative">
+                          <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400/20 animate-[spin_4s_linear_infinite]"></div>
+                          <Video className="w-8 h-8 sm:w-16 sm:h-16 text-cyan-400 opacity-20" />
+                        </div>
+                        <p className="mt-4 text-cyan-400/60 font-mono text-[10px] sm:text-xs uppercase tracking-widest">Waiting for Stranger Video...</p>
+                      </div>
+                    ) : (
+                      <video 
+                        ref={remoteVideoRef} 
+                        autoPlay 
+                        playsInline 
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+
+                    {/* Overlay Labels */}
+                    <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex gap-2">
+                      <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
+                        LIVE
+                      </span>
+                      <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300">
+                        Stranger {strangerId ? strangerId.substring(0, 4) : '...'}
+                      </span>
+                    </div>
+
+                    {/* Watermark */}
+                    <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 opacity-10 pointer-events-none">
+                      <span className="text-xl sm:text-2xl font-black italic">OMG TV</span>
+                    </div>
+                    
+                    {/* Mobile Chat Toggle Button */}
+                    <Button 
+                       size="icon"
+                       variant="ghost" 
+                       onClick={() => setShowChatPanel(!showChatPanel)}
+                       className={`absolute bottom-4 right-4 z-40 rounded-full w-12 h-12 transition-colors sm:hidden ${showChatPanel ? 'bg-cyan-500/20 text-cyan-400' : 'bg-black/50 text-white border border-white/10'}`}
+                       id="btn-toggle-chat"
+                    >
+                       <MessageSquare className="w-5 h-5" />
+                    </Button>
                   </div>
-                  <p className="mt-4 text-cyan-400/60 font-mono text-[10px] sm:text-xs uppercase tracking-widest">Waiting for Stranger Video...</p>
-                </div>
+              )}
 
-                {/* Overlay Labels */}
-                <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex gap-2">
-                  <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
-                    LIVE
-                  </span>
-                  <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300">
-                    Stranger {strangerId ? strangerId.substring(0, 4) : '...'}
-                  </span>
-                </div>
-
-                {/* Watermark */}
-                <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 opacity-10 pointer-events-none">
-                  <span className="text-xl sm:text-2xl font-black italic">OMG TV</span>
-                </div>
-                
-                {/* Mobile Chat Toggle Button */}
-                <Button 
-                   size="icon"
-                   variant="ghost" 
-                   onClick={() => setShowChatPanel(!showChatPanel)}
-                   className={`absolute bottom-4 right-4 z-40 rounded-full w-12 h-12 transition-colors sm:hidden ${showChatPanel ? 'bg-cyan-500/20 text-cyan-400' : 'bg-black/50 text-white border border-white/10'}`}
-                   id="btn-toggle-chat"
-                >
-                   <MessageSquare className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Interaction Sidebar (Right) */}
+              {/* Interaction Sidebar/Main Chat */}
               <AnimatePresence>
-                {showChatPanel && (
+                {(showChatPanel || !isVideoMatch) && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="w-full sm:w-80 flex flex-col gap-2 sm:gap-6 h-[45vh] sm:h-full shrink-0 z-30"
+                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 ${isVideoMatch ? 'w-full sm:w-80 h-[45vh] sm:h-full' : 'w-full h-full flex-1'}`}
                   >
                     
-                    {/* Self View - Hidden on mobile, shown on desktop */}
-                    <div className="hidden sm:block aspect-video w-full bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg shrink-0">
-                      <div className="absolute inset-0 bg-slate-800 flex items-center justify-center">
-                         {!isCamOn ? (
-                            <VideoOff className="w-8 h-8 text-slate-600" />
-                         ) : (
-                            <p className="text-[10px] text-slate-500 uppercase">Starting Camera...</p>
-                         )}
-                      </div>
-                      <video 
-                        ref={localVideoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded-md text-[9px] font-bold text-white z-10">HD</div>
-                      {!isMicOn && (
-                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-red-500/80 rounded-md z-10">
-                           <MicOff className="w-3 h-3 text-white" />
-                         </div>
-                      )}
-                    </div>
+                    {/* Self View - Hidden on mobile, shown on desktop (Only for video match) */}
+                    {isVideoMatch && (
+                        <div className="hidden sm:block aspect-video w-full bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg shrink-0">
+                          <div className="absolute inset-0 bg-slate-800 flex items-center justify-center">
+                             {!isCamOn ? (
+                                <VideoOff className="w-8 h-8 text-slate-600" />
+                             ) : (
+                                <p className="text-[10px] text-slate-500 uppercase">Starting Camera...</p>
+                             )}
+                          </div>
+                          <video 
+                            ref={localVideoRef} 
+                            autoPlay 
+                            playsInline 
+                            muted 
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
+                          />
+                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded-md text-[9px] font-bold text-white z-10">HD</div>
+                          {!isMicOn && (
+                             <div className="absolute bottom-2 left-2 px-2 py-1 bg-red-500/80 rounded-md z-10">
+                               <MicOff className="w-3 h-3 text-white" />
+                             </div>
+                          )}
+                        </div>
+                    )}
 
                     {/* Chat Messages Area */}
-                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden min-h-[30vh] sm:min-h-0">
+                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden h-0 shadow-xl">
                       
                       <div className="flex-1 overflow-y-auto pr-2 pb-2">
                         <div className="flex flex-col space-y-4">
@@ -357,18 +391,22 @@ export default function App() {
               
               {/* Settings Group */}
               <div className="flex items-center gap-2 sm:gap-3 sm:w-[280px]">
-                <button 
-                  onClick={() => setIsCamOn(!isCamOn)}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl border transition-all ${isCamOn ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}
-                >
-                  {isCamOn ? <Video className="w-5 h-5 sm:w-6 sm:h-6" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
-                </button>
-                <button 
-                  onClick={() => setIsMicOn(!isMicOn)}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl border transition-all ${isMicOn ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}
-                >
-                  {isMicOn ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
-                </button>
+                {isVideoMatch && (
+                    <>
+                        <button 
+                        onClick={() => setIsCamOn(!isCamOn)}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl border transition-all ${isCamOn ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}
+                        >
+                        {isCamOn ? <Video className="w-5 h-5 sm:w-6 sm:h-6" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
+                        </button>
+                        <button 
+                        onClick={() => setIsMicOn(!isMicOn)}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl sm:rounded-2xl border transition-all ${isMicOn ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}
+                        >
+                        {isMicOn ? <Mic className="w-5 h-5 sm:w-6 sm:h-6" /> : <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />}
+                        </button>
+                    </>
+                )}
               </div>
 
               {/* Primary Action */}
