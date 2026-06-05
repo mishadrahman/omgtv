@@ -10,7 +10,8 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const loginAnonymously = async () => {
   try {
     await signInAnonymously(auth);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error signing in anonymously:", error);
+    throw error;
   }
 };

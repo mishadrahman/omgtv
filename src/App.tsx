@@ -13,19 +13,25 @@ type AppState = 'landing' | 'searching' | 'chat';
 export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const { isSearching, activeSessionId, startSearch, stopSearch, leaveSession } = useMatchmaking();
   const { messages, sessionInfo, sendMessage, strangerId, messagesEndRef } = useChat(activeSessionId);
   const [messageInput, setMessageInput] = useState('');
-  
+
   // Fake video state
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [showChatPanel, setShowChatPanel] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        loginAnonymously();
+        try {
+          await loginAnonymously();
+        } catch (err: any) {
+          console.error(err);
+          setLoginError(err.message || 'Authentication failed. Please check Firebase settings.');
+        }
       } else {
         setIsAuthReady(true);
       }
@@ -116,7 +122,21 @@ export default function App() {
                 </p>
               </motion.div>
 
-              <div className="pt-8">
+              <div className="pt-8 flex flex-col items-center">
+                {loginError ? (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl p-4 text-sm text-center max-w-lg mb-4">
+                    <Shield className="w-5 h-5 mx-auto mb-2 opacity-80" />
+                    <p className="font-semibold mb-1">Firebase Authentication Required</p>
+                    {loginError.includes('admin-restricted-operation') ? (
+                      <p>Please open the Firebase Console, go to <strong>Authentication &gt; Sign-in method</strong>, and enable <strong>Anonymous</strong> sign-in.</p>
+                    ) : loginError.includes('network-request-failed') ? (
+                      <p>Please ensure your app domain is added to <strong>Authorized domains</strong> in the Firebase Auth settings, or check your connection.</p>
+                    ) : (
+                      <p>{loginError}</p>
+                    )}
+                  </div>
+                ) : null}
+
                 <Button 
                   onClick={handleStart}
                   disabled={!isAuthReady}
@@ -124,7 +144,7 @@ export default function App() {
                   id="btn-start-chat"
                 >
                   <Video className="w-6 h-6 mr-3" />
-                  {isAuthReady ? "Start Chatting" : "Connecting..."}
+                  {isAuthReady ? "Start Chatting" : (loginError ? "Unavailable" : "Connecting...")}
                 </Button>
               </div>
             </div>
