@@ -143,8 +143,7 @@ export default function App() {
                   <Button 
                     onClick={() => handleStart('text')}
                     disabled={!isAuthReady}
-                    variant="outline"
-                    className="h-14 sm:h-16 px-8 rounded-full font-bold text-lg border-white/10 hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
+                    className="h-14 sm:h-16 px-8 rounded-full font-bold text-lg bg-white/5 text-white border border-white/20 hover:bg-white/20 transition-all disabled:opacity-50"
                   >
                     <MessageSquare className="w-5 h-5 mr-3 text-cyan-400" />
                     {isAuthReady ? "Just Messaging" : (loginError ? "Unavailable" : "Connecting...")}

@@ -22,7 +22,7 @@ export function useMatchmaking() {
       queueRef, 
       where('status', '==', 'waiting'),
       where('matchType', '==', matchType),
-      limit(10)
+      limit(20)
     );
 
     try {
@@ -30,51 +30,45 @@ export function useMatchmaking() {
       
       let matchedSuccessfully = false;
 
-      // Try to match with someone using a transaction to avoid race conditions
+      // Try to match with someone
       for (const docSnap of snapshot.docs) {
-        if (docSnap.id === myUid || docSnap.id === previousMatchUid.current) continue;
+        const data = docSnap.data();
+        if (docSnap.id === myUid || docSnap.id === previousMatchUid.current || data.matchType !== matchType) continue;
         
         const candidateUid = docSnap.id;
         const candidateRef = docSnap.ref;
         const newSessionId = doc(collection(db, 'sessions')).id;
         
         try {
-          await runTransaction(db, async (transaction) => {
-            const candidateDoc = await transaction.get(candidateRef);
-            if (!candidateDoc.exists()) {
-              throw new Error("Document does not exist!");
-            }
-            const data = candidateDoc.data();
-            if (data.status !== 'waiting') {
-              throw new Error("Already matched");
-            }
-            
-            // Candidate is available!
-            // Create the session
-            const sessionRef = doc(db, 'sessions', newSessionId);
-            transaction.set(sessionRef, {
-              participants: [candidateUid, myUid],
-              matchType: matchType,
-              status: 'active',
-              createdAt: serverTimestamp()
-            });
+          // pre-create session
+          await setDoc(doc(db, 'sessions', newSessionId), {
+            participants: [candidateUid, myUid],
+            matchType: matchType,
+            status: 'active',
+            createdAt: serverTimestamp()
+          });
 
-            // Update candidate
-            transaction.update(candidateRef, {
+          try {
+            // try to claim candidate
+            await updateDoc(candidateRef, {
               status: 'matched',
               sessionId: newSessionId
             });
-          });
 
-          // If transaction succeeds:
-          matchedSuccessfully = true;
-          previousMatchUid.current = candidateUid;
-          setIsSearching(false);
-          setActiveSessionId(newSessionId);
-          break; // break out of the loop
-        } catch (e) {
-          console.log("Transaction failed, candidate taken or error:", e);
-          // Try the next candidate
+            // If we successfully updated the candidate, we won the lock!
+            matchedSuccessfully = true;
+            previousMatchUid.current = candidateUid;
+            setIsSearching(false);
+            setActiveSessionId(newSessionId);
+            break; // Break out of the loop
+          } catch (updateErr) {
+            console.warn("Failed to claim candidate (they were likely matched by someone else):", updateErr);
+            // Delete the orphaned session as we failed to claim the candidate
+            await updateDoc(doc(db, 'sessions', newSessionId), { status: 'ended' }).catch(() => {});
+            // Continue the loop to try the next candidate
+          }
+        } catch (e: any) {
+          console.error("Session creation failed:", e);
         }
       }
 
@@ -126,6 +120,8 @@ export function useMatchmaking() {
         }, (err) => handleFirestoreError(err, OperationType.GET, `queue/${myUid}`, auth));
       }
     } catch (e) {
+      console.error(e);
+      setIsSearching(false);
       handleFirestoreError(e, OperationType.LIST, 'queue', auth);
     }
   };
