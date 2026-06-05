@@ -2,26 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { Video, VideoOff, Mic, MicOff, SkipForward, MessageSquare, AlertTriangle, X, Shield, Activity, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { auth, loginAnonymously } from './firebase';
 import { useMatchmaking } from './hooks/useMatchmaking';
 import { useChat } from './hooks/useChat';
+import { useLocalVideo } from './hooks/useLocalVideo';
 import { onAuthStateChanged } from 'firebase/auth';
 
 type AppState = 'landing' | 'searching' | 'chat';
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('landing');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const { isSearching, activeSessionId, startSearch, stopSearch, leaveSession } = useMatchmaking();
   const { messages, sessionInfo, sendMessage, strangerId, messagesEndRef } = useChat(activeSessionId);
   const [messageInput, setMessageInput] = useState('');
 
-  // Fake video state
+  // Local Video Setup
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
+  const { localVideoRef, hasVideo } = useLocalVideo(isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
+
+  // Derive app state synchronously
+  const appState: AppState = isSearching ? 'searching' : activeSessionId ? 'chat' : 'landing';
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -39,21 +42,14 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  useEffect(() => {
-    if (isSearching) {
-      setAppState('searching');
-    } else if (activeSessionId) {
-      setAppState('chat');
-    } else {
-      setAppState('landing');
-    }
-  }, [isSearching, activeSessionId]);
-
   // Handle remotely ended session
   useEffect(() => {
     if (appState === 'chat' && sessionInfo?.status === 'ended') {
-      // Stranger skipped
-      handleNext();
+      const autoNext = async () => {
+        await leaveSession();
+        await startSearch();
+      };
+      autoNext();
     }
   }, [sessionInfo?.status, appState]);
 
@@ -239,7 +235,7 @@ export default function App() {
                     <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400/20 animate-[spin_4s_linear_infinite]"></div>
                     <Video className="w-8 h-8 sm:w-16 sm:h-16 text-cyan-400 opacity-20" />
                   </div>
-                  <p className="mt-4 text-cyan-400/60 font-mono text-[10px] sm:text-xs uppercase tracking-widest">Connected to Stranger</p>
+                  <p className="mt-4 text-cyan-400/60 font-mono text-[10px] sm:text-xs uppercase tracking-widest">Waiting for Stranger Video...</p>
                 </div>
 
                 {/* Overlay Labels */}
@@ -286,21 +282,28 @@ export default function App() {
                          {!isCamOn ? (
                             <VideoOff className="w-8 h-8 text-slate-600" />
                          ) : (
-                            <p className="text-[10px] text-slate-500 uppercase">Your Camera (Active)</p>
+                            <p className="text-[10px] text-slate-500 uppercase">Starting Camera...</p>
                          )}
                       </div>
-                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded-md text-[9px] font-bold text-white">HD</div>
+                      <video 
+                        ref={localVideoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
+                      />
+                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded-md text-[9px] font-bold text-white z-10">HD</div>
                       {!isMicOn && (
-                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-red-500/80 rounded-md">
+                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-red-500/80 rounded-md z-10">
                            <MicOff className="w-3 h-3 text-white" />
                          </div>
                       )}
                     </div>
 
                     {/* Chat Messages Area */}
-                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden min-h-0">
+                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden min-h-[30vh] sm:min-h-0">
                       
-                      <ScrollArea className="flex-1 pr-2">
+                      <div className="flex-1 overflow-y-auto pr-2 pb-2">
                         <div className="flex flex-col space-y-4">
                           <div className="flex flex-col gap-1 pb-2">
                             <span className="text-[10px] font-bold text-cyan-400 uppercase">System</span>
@@ -325,9 +328,9 @@ export default function App() {
                               </div>
                             );
                           })}
-                          <div ref={messagesEndRef} className="h-1" />
+                          <div ref={messagesEndRef} className="h-4" />
                         </div>
-                      </ScrollArea>
+                      </div>
                       
                       {/* Message Input */}
                       <form onSubmit={handleSend} className="mt-2 sm:mt-4 relative shrink-0">

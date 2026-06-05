@@ -135,11 +135,11 @@ export function useMatchmaking() {
       if (unsubscribeQueue.current) {
         unsubscribeQueue.current();
       }
-      if (isSearching && auth.currentUser) {
+      if (auth.currentUser) {
         deleteDoc(doc(db, 'queue', auth.currentUser.uid)).catch(() => {});
       }
     };
-  }, [isSearching]);
+  }, []);
 
   return { isSearching, activeSessionId, startSearch, stopSearch, leaveSession };
 }
