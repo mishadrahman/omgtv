@@ -17,7 +17,7 @@ export function useMatchmaking() {
     setIsSearching(true);
     setActiveSessionId(null);
 
-    const queueRef = collection(db, 'queue');
+    const queueRef = collection(db, 'queues_v2');
     const q = query(
       queueRef, 
       where('status', '==', 'waiting'),
@@ -74,7 +74,7 @@ export function useMatchmaking() {
 
       if (!matchedSuccessfully) {
         // Nobody found, add ourselves to queue
-        const myQueueRef = doc(db, 'queue', myUid);
+        const myQueueRef = doc(db, 'queues_v2', myUid);
         
         // Hard-delete any stuck queue entry
         try {
@@ -91,7 +91,7 @@ export function useMatchmaking() {
             createdAt: serverTimestamp()
           });
         } catch (e) {
-          handleFirestoreError(e, OperationType.CREATE, `queue/${myUid}`, auth);
+          handleFirestoreError(e, OperationType.CREATE, `queues_v2/${myUid}`, auth);
         }
 
         // Listen for changes
@@ -117,12 +117,12 @@ export function useMatchmaking() {
               }
             }
           }
-        }, (err) => handleFirestoreError(err, OperationType.GET, `queue/${myUid}`, auth));
+        }, (err) => handleFirestoreError(err, OperationType.GET, `queues_v2/${myUid}`, auth));
       }
     } catch (e) {
       console.error(e);
       setIsSearching(false);
-      handleFirestoreError(e, OperationType.LIST, 'queue', auth);
+      handleFirestoreError(e, OperationType.LIST, 'queues_v2', auth);
     }
   };
 
@@ -134,7 +134,7 @@ export function useMatchmaking() {
       unsubscribeQueue.current = null;
     }
     try {
-      await deleteDoc(doc(db, 'queue', auth.currentUser.uid));
+      await deleteDoc(doc(db, 'queues_v2', auth.currentUser.uid));
     } catch (e) {
       console.warn("Could not delete queue entry on stop", e);
     }

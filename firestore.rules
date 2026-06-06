@@ -25,7 +25,7 @@ service cloud.firestore {
         data.createdAt is timestamp;
     }
 
-    match /queue/{userId} {
+    match /queues_v2/{userId} {
       allow read: if isSignedIn() && isValidId(userId);
 
       allow list: if isSignedIn();
