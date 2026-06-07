@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useLocalVideo(isCamOn: boolean, isMicOn: boolean) {
+export function useLocalVideo(shouldStart: boolean, isCamOn: boolean, isMicOn: boolean) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     let activeStream: MediaStream | null = null;
+    
+    if (!shouldStart) {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+      }
+      return;
+    }
+
     const startMedia = async () => {
       try {
         const str = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -19,6 +28,7 @@ export function useLocalVideo(isCamOn: boolean, isMicOn: boolean) {
         console.error("Camera access denied or unavailable", err);
       }
     };
+    
     startMedia();
 
     return () => {
@@ -26,7 +36,7 @@ export function useLocalVideo(isCamOn: boolean, isMicOn: boolean) {
         activeStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [shouldStart]);
 
   useEffect(() => {
     if (stream) {

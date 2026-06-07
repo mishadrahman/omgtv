@@ -25,100 +25,102 @@ export function useMatchmaking() {
       limit(20)
     );
 
+    let matchedSuccessfully = false;
+
+    // First, make sure we are in the queue
+    const myQueueRef = doc(db, 'queues_v2', myUid);
     try {
-      const snapshot = await getDocs(q);
-      
-      let matchedSuccessfully = false;
+      await deleteDoc(myQueueRef); // clear any stuck state
+    } catch(e) {}
+    
+    try {
+      await setDoc(myQueueRef, {
+        uid: myUid,
+        status: 'waiting',
+        matchType: matchType,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `queues_v2/${myUid}`, auth);
+    }
+    
+    let unsubGlobalQueue: (() => void) | null = null;
+    let unsubMyQueue: (() => void) | null = null;
 
-      // Try to match with someone
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data();
-        if (docSnap.id === myUid || docSnap.id === previousMatchUid.current || data.matchType !== matchType) continue;
-        
-        const candidateUid = docSnap.id;
-        const candidateRef = docSnap.ref;
-        const newSessionId = doc(collection(db, 'sessions')).id;
-        
-        try {
-          // pre-create session
-          await setDoc(doc(db, 'sessions', newSessionId), {
-            participants: [candidateUid, myUid],
-            matchType: matchType,
-            status: 'active',
-            createdAt: serverTimestamp()
-          });
+    const cleanupAndFinish = (sessionId: string) => {
+       if (matchedSuccessfully) return; // Prevent double-triggering
+       matchedSuccessfully = true;
+       setIsSearching(false);
+       setActiveSessionId(sessionId);
+       if (unsubGlobalQueue) unsubGlobalQueue();
+       if (unsubMyQueue) unsubMyQueue();
+       if (unsubscribeQueue.current) unsubscribeQueue.current();
+       unsubscribeQueue.current = null;
+       deleteDoc(myQueueRef).catch(() => {}); // Clean up our entry
+    };
 
+    try {
+      // Listen to our own queue document to see if someone else matched us
+      unsubMyQueue = onSnapshot(myQueueRef, (docSnap) => {
+        if (docSnap.exists() && !matchedSuccessfully) {
+          const data = docSnap.data();
+          if (data.status === 'matched' && data.sessionId) {
+            cleanupAndFinish(data.sessionId);
+          }
+        }
+      }, (err) => handleFirestoreError(err, OperationType.GET, `queues_v2/${myUid}`, auth));
+
+      // Listen to the global queue to find others
+      unsubGlobalQueue = onSnapshot(q, async (snapshot) => {
+        if (matchedSuccessfully || !isSearching) return;
+
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+          if (docSnap.id === myUid || docSnap.id === previousMatchUid.current || data.matchType !== matchType) continue;
+          
+          const candidateUid = docSnap.id;
+          const candidateRef = docSnap.ref;
+          const newSessionId = doc(collection(db, 'sessions')).id;
+          
           try {
-            // try to claim candidate
-            await updateDoc(candidateRef, {
-              status: 'matched',
-              sessionId: newSessionId
+            // Pre-create session
+            await setDoc(doc(db, 'sessions', newSessionId), {
+              participants: [candidateUid, myUid],
+              matchType: matchType,
+              status: 'active',
+              createdAt: serverTimestamp()
             });
 
-            // If we successfully updated the candidate, we won the lock!
-            matchedSuccessfully = true;
-            previousMatchUid.current = candidateUid;
-            setIsSearching(false);
-            setActiveSessionId(newSessionId);
-            break; // Break out of the loop
-          } catch (updateErr) {
-            console.warn("Failed to claim candidate (they were likely matched by someone else):", updateErr);
-            // Delete the orphaned session as we failed to claim the candidate
-            await updateDoc(doc(db, 'sessions', newSessionId), { status: 'ended' }).catch(() => {});
-            // Continue the loop to try the next candidate
-          }
-        } catch (e: any) {
-          console.error("Session creation failed:", e);
-        }
-      }
+            try {
+              // Try to claim candidate
+              await updateDoc(candidateRef, {
+                status: 'matched',
+                sessionId: newSessionId
+              });
 
-      if (!matchedSuccessfully) {
-        // Nobody found, add ourselves to queue
-        const myQueueRef = doc(db, 'queues_v2', myUid);
-        
-        // Hard-delete any stuck queue entry
-        try {
-          await deleteDoc(myQueueRef);
-        } catch (e) {
-          // ignore
-        }
-
-        try {
-          await setDoc(myQueueRef, {
-            uid: myUid,
-            status: 'waiting',
-            matchType: matchType,
-            createdAt: serverTimestamp()
-          });
-        } catch (e) {
-          handleFirestoreError(e, OperationType.CREATE, `queues_v2/${myUid}`, auth);
-        }
-
-        // Listen for changes
-        if (unsubscribeQueue.current) {
-          unsubscribeQueue.current();
-          unsubscribeQueue.current = null;
-        }
-
-        unsubscribeQueue.current = onSnapshot(myQueueRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.status === 'matched' && data.sessionId) {
-              // We got matched!
-              setIsSearching(false);
-              setActiveSessionId(data.sessionId);
-              
-              // Clean up queue entry
-              deleteDoc(myQueueRef).catch(console.error);
-              
-              if (unsubscribeQueue.current) {
-                unsubscribeQueue.current();
-                unsubscribeQueue.current = null;
-              }
+              // We won the lock!
+              previousMatchUid.current = candidateUid;
+              cleanupAndFinish(newSessionId);
+              break;
+            } catch (updateErr) {
+              console.warn("Failed to claim candidate:", updateErr);
+              await updateDoc(doc(db, 'sessions', newSessionId), { status: 'ended' }).catch(() => {});
             }
+          } catch (e: any) {
+            console.error("Session creation failed:", e);
           }
-        }, (err) => handleFirestoreError(err, OperationType.GET, `queues_v2/${myUid}`, auth));
-      }
+        }
+      }, (err) => {
+          handleFirestoreError(err, OperationType.LIST, 'queues_v2', auth);
+      });
+
+      // Override the main unsubscribe so the component can stop it if user cancels
+      unsubscribeQueue.current = () => {
+        if (unsubGlobalQueue) unsubGlobalQueue();
+        if (unsubMyQueue) unsubMyQueue();
+        matchedSuccessfully = true;
+      };
+
     } catch (e) {
       console.error(e);
       setIsSearching(false);

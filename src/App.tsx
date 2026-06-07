@@ -20,18 +20,19 @@ export default function App() {
   
   const [currentMatchType, setCurrentMatchType] = useState<MatchType>('video');
 
+  // Derive app state synchronously
+  const appState: AppState = isSearching ? 'searching' : activeSessionId ? 'chat' : 'landing';
+
   // Local Video Setup
   const isVideoMatch = currentMatchType === 'video';
+  const shouldStartMedia = appState !== 'landing' && isVideoMatch;
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const { localVideoRef, localStream, hasVideo } = useLocalVideo(isVideoMatch && isCamOn, isVideoMatch && isMicOn);
+  const { localVideoRef, localStream, hasVideo } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
 
   // WebRTC Setup
   const { remoteVideoRef, hasRemoteVideo } = useWebRTC(isVideoMatch ? activeSessionId : null, localStream);
-
-  // Derive app state synchronously
-  const appState: AppState = isSearching ? 'searching' : activeSessionId ? 'chat' : 'landing';
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -143,7 +144,7 @@ export default function App() {
                   <Button 
                     onClick={() => handleStart('text')}
                     disabled={!isAuthReady}
-                    className="h-14 sm:h-16 px-8 rounded-full font-bold text-lg bg-white/5 text-white border border-white/20 hover:bg-white/20 transition-all disabled:opacity-50"
+                    className="h-14 sm:h-16 px-8 rounded-full font-bold text-lg bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 transition-all disabled:opacity-50"
                   >
                     <MessageSquare className="w-5 h-5 mr-3 text-cyan-400" />
                     {isAuthReady ? "Just Messaging" : (loginError ? "Unavailable" : "Connecting...")}

@@ -25,6 +25,7 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
     let pc: RTCPeerConnection;
     let unsubSession: () => void;
     let unsubCandidates: () => void;
+    let pendingCandidates: any[] = [];
 
     const initConnection = async () => {
       pc = new RTCPeerConnection({
@@ -74,11 +75,14 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
         await updateDoc(sessionDocRef, { offer });
 
         // Listen for remote answer
-        unsubSession = onSnapshot(sessionDocRef, (snapshot) => {
+        unsubSession = onSnapshot(sessionDocRef, async (snapshot) => {
           const data = snapshot.data();
           if (!pc.currentRemoteDescription && data && data.answer) {
             const answerDescription = new RTCSessionDescription(data.answer);
-            pc.setRemoteDescription(answerDescription);
+            await pc.setRemoteDescription(answerDescription);
+            
+            pendingCandidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error));
+            pendingCandidates = [];
           }
         });
 
@@ -87,7 +91,11 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'added') {
               let data = change.doc.data();
-              pc.addIceCandidate(new RTCIceCandidate(data));
+              if (pc.remoteDescription) {
+                pc.addIceCandidate(new RTCIceCandidate(data)).catch(console.error);
+              } else {
+                pendingCandidates.push(data);
+              }
             }
           });
         });
@@ -99,6 +107,9 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
           if (!pc.currentRemoteDescription && data && data.offer) {
             const offerDescription = new RTCSessionDescription(data.offer);
             await pc.setRemoteDescription(offerDescription);
+
+            pendingCandidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error));
+            pendingCandidates = [];
 
             const answerDescription = await pc.createAnswer();
             await pc.setLocalDescription(answerDescription);
@@ -117,7 +128,11 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'added') {
               let data = change.doc.data();
-              pc.addIceCandidate(new RTCIceCandidate(data));
+              if (pc.remoteDescription) {
+                pc.addIceCandidate(new RTCIceCandidate(data)).catch(console.error);
+              } else {
+                pendingCandidates.push(data);
+              }
             }
           });
         });
