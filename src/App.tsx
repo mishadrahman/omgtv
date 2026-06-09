@@ -134,13 +134,13 @@ export default function App() {
                 animate={{ scale: 1 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               >
-                <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter mb-4">
+                <h1 className="text-4xl sm:text-7xl font-bold tracking-tighter mb-4">
                   Meet random<br/>
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
                     people instantly.
                   </span>
                 </h1>
-                <p className="text-slate-400 text-lg max-w-lg mx-auto">
+                <p className="text-slate-400 text-sm sm:text-lg max-w-lg mx-auto px-4">
                   Experience next-generation anonymous video and text chat. No signups, no tracking. Just instant connections.
                 </p>
               </motion.div>
@@ -286,7 +286,7 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
-                    className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-[30vh]"
+                    className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-0"
                   >
                     {!hasRemoteVideo ? (
                       <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
@@ -342,7 +342,7 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 ${isVideoMatch ? 'w-full sm:w-80 h-[45vh] sm:h-full' : 'w-full h-full flex-1'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 min-h-0 ${isVideoMatch ? 'w-full sm:w-80 flex-[0.8] sm:flex-initial sm:h-full' : 'w-full h-full flex-1'}`}
                   >
                     
                     {/* Self View - Hidden on mobile, shown on desktop (Only for video match) */}
@@ -452,17 +452,17 @@ export default function App() {
               </div>
 
               {/* Primary Action */}
-              <div className="flex items-center gap-2 sm:gap-4 justify-center flex-1 sm:flex-none">
-                 <button onClick={handleStop} className="group h-12 sm:h-16 px-6 sm:px-12 bg-gradient-to-r from-red-600 to-orange-600 rounded-full font-black text-xs sm:text-xl tracking-tighter flex items-center gap-2 sm:gap-3 shadow-[0_0_20px_rgba(220,38,38,0.3)] sm:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:scale-105 active:scale-95 transition-all">
-                  <span>STOP</span>
-                  <div className="w-4 h-4 sm:w-6 sm:h-6 bg-white/20 rounded-md sm:rounded-lg flex items-center justify-center">
+              <div className="flex items-center gap-1 sm:gap-4 justify-center flex-1 sm:flex-none">
+                 <button onClick={handleStop} className="group h-10 sm:h-16 px-3 sm:px-12 bg-gradient-to-r from-red-600 to-orange-600 rounded-full font-black text-[10px] sm:text-xl tracking-tighter flex items-center justify-center gap-1 sm:gap-3 shadow-[0_0_20px_rgba(220,38,38,0.3)] sm:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:scale-105 active:scale-95 transition-all flex-1 sm:flex-none min-w-0">
+                  <span className="truncate">STOP</span>
+                  <div className="w-3 h-3 sm:w-6 sm:h-6 bg-white/20 rounded-sm sm:rounded-lg flex items-center justify-center shrink-0">
                      <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 bg-white"></div>
                   </div>
-                </button>
-                <button onClick={handleNext} className="group h-12 sm:h-16 px-6 sm:px-12 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full font-black text-xs sm:text-xl tracking-tighter flex items-center gap-2 sm:gap-3 shadow-[0_0_20px_rgba(6,182,212,0.3)] sm:shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:scale-105 active:scale-95 transition-all">
-                  <span>NEXT</span>
-                  <SkipForward className="w-4 h-4 sm:w-6 sm:h-6 fill-current" />
-                </button>
+                 </button>
+                 <button onClick={handleNext} className="group h-10 sm:h-16 px-3 sm:px-12 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full font-black text-[10px] sm:text-xl tracking-tighter flex items-center justify-center gap-1 sm:gap-3 shadow-[0_0_20px_rgba(6,182,212,0.3)] sm:shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:scale-105 active:scale-95 transition-all flex-1 sm:flex-none min-w-0">
+                  <span className="truncate">NEXT</span>
+                  <SkipForward className="w-3 h-3 sm:w-6 sm:h-6 fill-current shrink-0" />
+                 </button>
               </div>
 
               {/* Utility/Report Group */}
