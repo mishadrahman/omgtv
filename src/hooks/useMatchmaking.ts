@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, limit, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, deleteDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, deleteDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { OperationType, handleFirestoreError } from '../lib/firebase-utils';
 
@@ -47,9 +47,12 @@ export function useMatchmaking() {
     let unsubGlobalQueue: (() => void) | null = null;
     let unsubMyQueue: (() => void) | null = null;
 
+    let searchActive = true;
+
     const cleanupAndFinish = (sessionId: string) => {
        if (matchedSuccessfully) return; // Prevent double-triggering
        matchedSuccessfully = true;
+       searchActive = false;
        setIsSearching(false);
        setActiveSessionId(sessionId);
        if (unsubGlobalQueue) unsubGlobalQueue();
@@ -70,9 +73,8 @@ export function useMatchmaking() {
         }
       }, (err) => handleFirestoreError(err, OperationType.GET, `queues_v2/${myUid}`, auth));
 
-      // Listen to the global queue to find others
       unsubGlobalQueue = onSnapshot(q, async (snapshot) => {
-        if (matchedSuccessfully || !isSearching) return;
+        if (matchedSuccessfully || !searchActive) return;
 
         for (const docSnap of snapshot.docs) {
           const data = docSnap.data();
@@ -80,31 +82,34 @@ export function useMatchmaking() {
           
           const candidateUid = docSnap.id;
           const candidateRef = docSnap.ref;
-          const newSessionId = doc(collection(db, 'sessions')).id;
           
           try {
+            const batch = writeBatch(db);
+            const sessionRef = doc(collection(db, 'sessions'));
+            const newSessionId = sessionRef.id;
+
             // Pre-create session
-            await setDoc(doc(db, 'sessions', newSessionId), {
+            batch.set(sessionRef, {
               participants: [candidateUid, myUid],
               matchType: matchType,
               status: 'active',
               createdAt: serverTimestamp()
             });
 
-            try {
-              // Try to claim candidate
-              await updateDoc(candidateRef, {
-                status: 'matched',
-                sessionId: newSessionId
-              });
+            // Try to claim candidate
+            batch.update(candidateRef, {
+              status: 'matched',
+              sessionId: newSessionId
+            });
 
+            try {
+              await batch.commit();
               // We won the lock!
               previousMatchUid.current = candidateUid;
               cleanupAndFinish(newSessionId);
               break;
             } catch (updateErr) {
               console.warn("Failed to claim candidate:", updateErr);
-              await updateDoc(doc(db, 'sessions', newSessionId), { status: 'ended' }).catch(() => {});
             }
           } catch (e: any) {
             console.error("Session creation failed:", e);
@@ -116,6 +121,7 @@ export function useMatchmaking() {
 
       // Override the main unsubscribe so the component can stop it if user cancels
       unsubscribeQueue.current = () => {
+        searchActive = false;
         if (unsubGlobalQueue) unsubGlobalQueue();
         if (unsubMyQueue) unsubMyQueue();
         matchedSuccessfully = true;

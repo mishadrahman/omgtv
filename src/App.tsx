@@ -9,6 +9,9 @@ import { useLocalVideo } from './hooks/useLocalVideo';
 import { useWebRTC } from './hooks/useWebRTC';
 import { onAuthStateChanged } from 'firebase/auth';
 
+import { SafetyModal } from './components/SafetyModal';
+import { PrivacyModal } from './components/PrivacyModal';
+
 type AppState = 'landing' | 'searching' | 'chat';
 
 export default function App() {
@@ -30,6 +33,9 @@ export default function App() {
   const [isMicOn, setIsMicOn] = useState(true);
   const { localVideoRef, localStream, hasVideo } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
+  
+  const [showSafety, setShowSafety] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   // WebRTC Setup
   const { remoteVideoRef, hasRemoteVideo } = useWebRTC(isVideoMatch ? activeSessionId : null, localStream);
@@ -49,6 +55,19 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // Prevent accidental reload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (appState !== 'landing') {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [appState]);
 
   // Handle remotely ended session
   useEffect(() => {
@@ -163,10 +182,16 @@ export default function App() {
             </div>
 
             <div className="absolute bottom-6 flex gap-6 text-sm text-slate-500">
-              <div className="flex items-center gap-2 hover:text-slate-300 transition-colors cursor-pointer">
+              <div 
+                onClick={() => setShowSafety(true)}
+                className="flex items-center gap-2 hover:text-slate-300 transition-colors cursor-pointer"
+              >
                 <Shield className="w-4 h-4" /> Safety Guidelines
               </div>
-              <div className="hover:text-slate-300 transition-colors cursor-pointer">
+              <div 
+                onClick={() => setShowPrivacy(true)}
+                className="hover:text-slate-300 transition-colors cursor-pointer"
+              >
                 Privacy Policy
               </div>
             </div>
@@ -230,7 +255,12 @@ export default function App() {
             className="flex-1 w-full h-[100dvh] flex flex-col max-w-7xl mx-auto overflow-hidden relative"
           >
             {/* Header Navigation for Chat */}
-            <header className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-8 bg-black/40 border-b border-white/5 backdrop-blur-md">
+            <motion.header 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-8 bg-black/40 border-b border-white/5 backdrop-blur-md"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
                   <span className="font-black text-white text-xs">OMG</span>
@@ -244,14 +274,19 @@ export default function App() {
                   <span className="text-[10px] text-green-500 uppercase">Live</span>
                 </div>
               </div>
-            </header>
+            </motion.header>
 
             {/* Main Content Split */}
             <main className={`flex-1 flex flex-col sm:flex-row p-2 sm:p-6 gap-2 sm:gap-6 overflow-hidden min-h-0 ${!isVideoMatch ? 'max-w-3xl mx-auto w-full' : ''}`}>
               
               {/* Video Area (Left) - Only show if it's a video match */}
               {isVideoMatch && (
-                  <div className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-[30vh]">
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
+                    className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-[30vh]"
+                  >
                     {!hasRemoteVideo ? (
                       <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
                         <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border border-cyan-400/30 flex items-center justify-center bg-cyan-400/5 relative">
@@ -295,7 +330,7 @@ export default function App() {
                     >
                        <MessageSquare className="w-5 h-5" />
                     </Button>
-                  </div>
+                  </motion.div>
               )}
 
               {/* Interaction Sidebar/Main Chat */}
@@ -305,6 +340,7 @@ export default function App() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
                     className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 ${isVideoMatch ? 'w-full sm:w-80 h-[45vh] sm:h-full' : 'w-full h-full flex-1'}`}
                   >
                     
@@ -387,7 +423,12 @@ export default function App() {
             </main>
 
             {/* Control Bar */}
-            <footer className="h-20 sm:h-24 px-4 sm:px-8 flex items-center justify-between bg-black/60 border-t border-white/5 backdrop-blur-2xl shrink-0">
+            <motion.footer 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+              className="h-20 sm:h-24 px-4 sm:px-8 flex items-center justify-between bg-black/60 border-t border-white/5 backdrop-blur-2xl shrink-0"
+            >
               
               {/* Settings Group */}
               <div className="flex items-center gap-2 sm:gap-3 sm:w-[280px]">
@@ -430,10 +471,13 @@ export default function App() {
                   REPORT
                 </button>
               </div>
-            </footer>
+            </motion.footer>
           </motion.div>
         )}
       </AnimatePresence>
+      
+      <SafetyModal isOpen={showSafety} onClose={() => setShowSafety(false)} />
+      <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   );
 }
