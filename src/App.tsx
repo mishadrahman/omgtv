@@ -122,9 +122,7 @@ export default function App() {
             className="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center justify-center p-6"
           >
             <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-                <span className="font-black text-white text-xs">OMG</span>
-              </div>
+              <img src="./icon-512.png" alt="OMG TV Logo" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">OMG TV</span>
             </div>
 
@@ -209,9 +207,7 @@ export default function App() {
             className="flex-1 w-full flex flex-col items-center justify-center p-6 relative"
           >
             <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-                <span className="font-black text-white text-xs">OMG</span>
-              </div>
+              <img src="./icon-512.png" alt="OMG TV Logo" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">OMG TV</span>
             </div>
 
@@ -263,10 +259,8 @@ export default function App() {
               className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-8 bg-black/40 border-b border-white/5 backdrop-blur-md"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-                  <span className="font-black text-white text-xs">OMG</span>
-                </div>
-                <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 hidden sm:block">OMG TV</h1>
+                <img src="./icon-512.png" alt="OMG TV Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 hidden sm:block">OMG TV</h1>
               </div>
               <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm font-medium text-slate-400 uppercase tracking-widest items-center">
                 <span className="hidden sm:inline hover:text-cyan-400 transition-colors cursor-pointer">Safety</span>
