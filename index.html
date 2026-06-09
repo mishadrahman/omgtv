@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="manifest" href="./manifest.json" />
-    <link rel="icon" href="./favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="./icon-512.png" />
+    <link rel="manifest" href="./manifest.json?v=2" />
+    <link rel="icon" href="./logo.webp" type="image/webp" />
+    <link rel="apple-touch-icon" href="./logo.webp" />
     <meta name="theme-color" content="#020617" />
     <title>OMG TV</title>
   </head>
@@ -14,7 +14,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').catch(err => {
+          navigator.serviceWorker.register('./sw.js?v=2').catch(err => {
             console.log('ServiceWorker registration failed: ', err);
           });
         });
