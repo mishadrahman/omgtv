@@ -1,0 +1,17 @@
+{
+  "name": "OMG TV",
+  "short_name": "OMG TV",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#06b6d4",
+  "description": "Next-generation anonymous video and text chat.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

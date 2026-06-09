@@ -11,6 +11,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 import { SafetyModal } from './components/SafetyModal';
 import { PrivacyModal } from './components/PrivacyModal';
+import { InstallPrompt } from './components/InstallPrompt';
 
 type AppState = 'landing' | 'searching' | 'chat';
 
@@ -120,7 +121,7 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center justify-center p-6"
           >
-            <div className="absolute top-6 left-6 flex items-center gap-3">
+            <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
                 <span className="font-black text-white text-xs">OMG</span>
               </div>
@@ -207,7 +208,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="flex-1 w-full flex flex-col items-center justify-center p-6 relative"
           >
-            <div className="absolute top-6 left-6 flex items-center gap-3">
+            <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
                 <span className="font-black text-white text-xs">OMG</span>
               </div>
@@ -478,6 +479,7 @@ export default function App() {
       
       <SafetyModal isOpen={showSafety} onClose={() => setShowSafety(false)} />
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <InstallPrompt />
     </div>
   );
 }
