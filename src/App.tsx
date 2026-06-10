@@ -32,7 +32,7 @@ export default function App() {
   const shouldStartMedia = appState !== 'landing' && isVideoMatch;
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const { localVideoRef: _hookLocalVideoRef, localStream, hasVideo, isReady: isLocalVideoReady } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
+  const { localVideoRef, localStream, hasVideo, isReady: isLocalVideoReady } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
   
   const [showSafety, setShowSafety] = useState(false);
@@ -40,16 +40,13 @@ export default function App() {
 
   // WebRTC Setup
   const shouldConnectWebRTC = isVideoMatch ? (isLocalVideoReady ? activeSessionId : null) : null;
-  const localVideoRef = React.useRef<HTMLVideoElement>(null);
   const { remoteVideoRef, hasRemoteVideo } = useWebRTC(shouldConnectWebRTC, localStream);
   
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      if (localVideoRef.current.srcObject !== localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
+    if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream, appState, showChatPanel]);
+  }, [localStream, appState]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -119,7 +116,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center">
+    <div className="h-[100dvh] w-full bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center">
       <AnimatePresence mode="wait">
         
         {/* Landing Page */}
@@ -259,7 +256,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-1 w-full h-[100dvh] flex flex-col max-w-7xl mx-auto overflow-hidden relative"
+            className="flex-1 w-full h-full flex flex-col max-w-7xl mx-auto overflow-hidden relative"
           >
             {/* Header Navigation for Chat */}
             <motion.header 
@@ -370,7 +367,7 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full shrink min-h-[0px] h-full sm:shrink-0' : 'w-full h-full flex-1'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 shrink m-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 h-auto sm:h-full' : 'w-full flex-1 h-full'}`}
                   >
                     
                     {/* Chat Messages Area */}
