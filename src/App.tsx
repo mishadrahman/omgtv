@@ -43,9 +43,15 @@ export default function App() {
   const { remoteVideoRef, hasRemoteVideo } = useWebRTC(shouldConnectWebRTC, localStream);
   
   useEffect(() => {
-    if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
+    const bindStream = () => {
+      if (localVideoRef.current && localStream && localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+        localVideoRef.current.play().catch(e => console.log('play error', e));
+      }
+    };
+    bindStream();
+    const intervalId = setInterval(bindStream, 300);
+    return () => clearInterval(intervalId);
   }, [localStream, appState]);
 
   useEffect(() => {
@@ -367,7 +373,7 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 shrink m-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 h-auto sm:h-full' : 'w-full flex-1 h-full'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 shrink-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full' : 'w-full flex-1 h-full'}`}
                   >
                     
                     {/* Chat Messages Area */}
