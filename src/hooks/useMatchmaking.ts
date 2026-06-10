@@ -33,20 +33,13 @@ export function useMatchmaking() {
       await deleteDoc(myQueueRef); // clear any stuck state
     } catch(e) {}
     
-    let heartbeatInterval: any;
     try {
       await setDoc(myQueueRef, {
         uid: myUid,
         status: 'waiting',
         matchType: matchType,
-        updatedAt: serverTimestamp()
+        createdAt: serverTimestamp()
       });
-      // Ping DB every 10 seconds to show we are still alive
-      heartbeatInterval = setInterval(() => {
-        if (!matchedSuccessfully && searchActive) {
-          updateDoc(myQueueRef, { updatedAt: serverTimestamp() }).catch(() => {});
-        }
-      }, 10000);
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, `queues_v2/${myUid}`, auth);
     }
@@ -62,7 +55,6 @@ export function useMatchmaking() {
        searchActive = false;
        setIsSearching(false);
        setActiveSessionId(sessionId);
-       if (heartbeatInterval) clearInterval(heartbeatInterval);
        if (unsubGlobalQueue) unsubGlobalQueue();
        if (unsubMyQueue) unsubMyQueue();
        if (unsubscribeQueue.current) unsubscribeQueue.current();
@@ -89,16 +81,6 @@ export function useMatchmaking() {
         for (const docSnap of snapshot.docs) {
           const data = docSnap.data();
           if (docSnap.id === myUid || docSnap.id === previousMatchUid.current || data.matchType !== matchType) continue;
-          
-          if (!data.updatedAt) {
-             continue; // Ignore old zombie records that do not have the updatedAt field
-          }
-          
-          const ageInSeconds = (now - data.updatedAt.toMillis()) / 1000;
-          if (ageInSeconds > 25) {
-             // Ignore candidates whose last heartbeat was more than 25 seconds ago
-             continue;
-          }
           
           const candidateUid = docSnap.id;
           const candidateRef = docSnap.ref;
@@ -142,7 +124,6 @@ export function useMatchmaking() {
       // Override the main unsubscribe so the component can stop it if user cancels
       unsubscribeQueue.current = () => {
         searchActive = false;
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
         if (unsubGlobalQueue) unsubGlobalQueue();
         if (unsubMyQueue) unsubMyQueue();
         matchedSuccessfully = true;

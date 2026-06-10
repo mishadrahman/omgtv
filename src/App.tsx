@@ -290,7 +290,7 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
-                    className={`relative bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl shrink-0 sm:shrink ${showChatPanel ? 'h-[250px] sm:h-auto sm:flex-1' : 'flex-1 h-full'}`}
+                    className={`relative bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl flex-none sm:flex-1 ${showChatPanel ? 'h-[40vh] sm:h-auto min-h-[200px]' : 'h-full flex-1'}`}
                   >
                     {!hasRemoteVideo ? (
                       <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
@@ -370,7 +370,7 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 sm:shrink-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full' : 'w-full h-full flex-1'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full shrink min-h-[0px] h-full sm:shrink-0' : 'w-full h-full flex-1'}`}
                   >
                     
                     {/* Chat Messages Area */}

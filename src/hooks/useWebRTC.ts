@@ -28,6 +28,7 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
     let pendingCandidates: any[] = [];
 
     const initConnection = async () => {
+      console.log("[WebRTC] initConnection started for session:", sessionId, "isCaller pending...");
       pc = new RTCPeerConnection({
         iceServers: [
           { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
@@ -35,35 +36,53 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
       });
       pcRef.current = pc;
 
+      pc.oniceconnectionstatechange = () => console.log("[WebRTC] ICE Connection State:", pc.iceConnectionState);
+      pc.onconnectionstatechange = () => console.log("[WebRTC] Connection State:", pc.connectionState);
+
       // Add local tracks
       if (localStream) {
+        console.log("[WebRTC] Adding local tracks:", localStream.getTracks().length);
         localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+      } else {
+        console.warn("[WebRTC] initConnection called with NO localStream");
       }
 
       // Handle incoming remote tracks
       pc.ontrack = (event) => {
+        console.log("[WebRTC] ontrack received event:", event);
         if (event.streams && event.streams[0]) {
+          console.log("[WebRTC] Setting remote stream.");
           setRemoteStream(event.streams[0]);
+        } else {
+          console.log("[WebRTC] creating remote stream from track");
+          const stream = new MediaStream([event.track]);
+          setRemoteStream(stream);
         }
       };
 
       // Determine who is caller and who is callee based on participants array in session
       const snap = await getDoc(sessionDocRef);
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+         console.warn("[WebRTC] Session does not exist!");
+         return;
+      }
       const data = snap.data();
       isCaller = data.participants[1] === myUid; // The one who created the session is participants[1]
+      console.log("[WebRTC] I am", isCaller ? "CALLER" : "CALLEE");
 
       const callerCandidatesCollection = collection(sessionDocRef, 'callerCandidates');
       const calleeCandidatesCollection = collection(sessionDocRef, 'calleeCandidates');
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log("[WebRTC] Sending ICE candidate");
           addDoc(isCaller ? callerCandidatesCollection : calleeCandidatesCollection, event.candidate.toJSON());
         }
       };
 
       if (isCaller) {
         // Create Offer
+        console.log("[WebRTC] Creating offer");
         const offerDescription = await pc.createOffer();
         await pc.setLocalDescription(offerDescription);
 
@@ -73,11 +92,13 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
         };
 
         await updateDoc(sessionDocRef, { offer });
+        console.log("[WebRTC] Offer set in DB");
 
         // Listen for remote answer
         unsubSession = onSnapshot(sessionDocRef, async (snapshot) => {
           const data = snapshot.data();
           if (!pc.currentRemoteDescription && data && data.answer) {
+             console.log("[WebRTC] Received Answer from DB");
             const answerDescription = new RTCSessionDescription(data.answer);
             await pc.setRemoteDescription(answerDescription);
             
@@ -105,12 +126,14 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
         unsubSession = onSnapshot(sessionDocRef, async (snapshot) => {
           const data = snapshot.data();
           if (!pc.currentRemoteDescription && data && data.offer) {
+            console.log("[WebRTC] Received Offer from DB");
             const offerDescription = new RTCSessionDescription(data.offer);
             await pc.setRemoteDescription(offerDescription);
 
             pendingCandidates.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error));
             pendingCandidates = [];
 
+            console.log("[WebRTC] Creating Answer");
             const answerDescription = await pc.createAnswer();
             await pc.setLocalDescription(answerDescription);
 
@@ -120,6 +143,7 @@ export function useWebRTC(sessionId: string | null, localStream: MediaStream | n
             };
 
             await updateDoc(sessionDocRef, { answer });
+            console.log("[WebRTC] Answer set in DB");
           }
         });
 
