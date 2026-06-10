@@ -32,7 +32,7 @@ export default function App() {
   const shouldStartMedia = appState !== 'landing' && isVideoMatch;
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const { localVideoRef, localStream, hasVideo, isReady: isLocalVideoReady } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
+  const { localVideoRef: _hookLocalVideoRef, localStream, hasVideo, isReady: isLocalVideoReady } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
   
   const [showSafety, setShowSafety] = useState(false);
@@ -40,7 +40,16 @@ export default function App() {
 
   // WebRTC Setup
   const shouldConnectWebRTC = isVideoMatch ? (isLocalVideoReady ? activeSessionId : null) : null;
+  const localVideoRef = React.useRef<HTMLVideoElement>(null);
   const { remoteVideoRef, hasRemoteVideo } = useWebRTC(shouldConnectWebRTC, localStream);
+  
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
+    }
+  }, [localStream, appState, showChatPanel]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -281,7 +290,7 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
-                    className={`relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-0 ${showChatPanel ? 'h-[55%] sm:h-auto' : 'h-full'}`}
+                    className={`relative bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl shrink-0 sm:shrink ${showChatPanel ? 'h-[250px] sm:h-auto sm:flex-1' : 'flex-1 h-full'}`}
                   >
                     {!hasRemoteVideo ? (
                       <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
@@ -361,11 +370,11 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 min-h-0 ${isVideoMatch ? 'w-full h-[45%] sm:w-80 sm:flex-initial sm:h-full' : 'w-full h-full flex-1'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 sm:shrink-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full' : 'w-full h-full flex-1'}`}
                   >
                     
                     {/* Chat Messages Area */}
-                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden h-0 shadow-xl">
+                    <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden min-h-0 shadow-xl">
                       
                       <div className="flex-1 overflow-y-auto pr-2 pb-2">
                         <div className="flex flex-col space-y-4">
