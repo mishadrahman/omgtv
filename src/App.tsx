@@ -105,12 +105,16 @@ export default function App() {
   };
 
   const handleNext = async () => {
-    await leaveSession();
-    await startSearch(currentMatchType);
+    if (window.confirm("Are you sure you want to skip to the next person?")) {
+      await leaveSession();
+      await startSearch(currentMatchType);
+    }
   };
 
   const handleStop = async () => {
-    await leaveSession();
+    if (window.confirm("Are you sure you want to stop the chat?")) {
+      await leaveSession();
+    }
   };
 
   const handleSend = (e: React.FormEvent) => {
@@ -122,7 +126,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center">
+    <div className="fixed inset-0 w-full bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center">
       <AnimatePresence mode="wait">
         
         {/* Landing Page */}
@@ -337,7 +341,7 @@ export default function App() {
                         autoPlay 
                         playsInline 
                         muted 
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 scale-x-[-1] ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
                       />
                       <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 px-1.5 py-0.5 bg-black/60 rounded-md text-[8px] sm:text-[9px] font-bold text-white z-10">YOU</div>
                       {!isMicOn && (
@@ -373,7 +377,7 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 shrink-0 ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full' : 'w-full flex-1 h-full'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 z-30 min-h-0 shrink ${isVideoMatch ? 'flex-1 sm:flex-none sm:w-80 sm:h-full' : 'w-full flex-1 h-full'}`}
                   >
                     
                     {/* Chat Messages Area */}
