@@ -32,9 +32,7 @@ export function SafetyModal({ isOpen, onClose }: SafetyModalProps) {
           </button>
 
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center border border-red-500/30">
-              <Shield className="w-6 h-6 text-red-400" />
-            </div>
+            <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" className="w-12 h-12 rounded-2xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
             <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Safety Guidelines</h2>
           </div>
 

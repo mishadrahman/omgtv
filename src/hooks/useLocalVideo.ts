@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 export function useLocalVideo(shouldStart: boolean, isCamOn: boolean, isMicOn: boolean) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let activeStream: MediaStream | null = null;
@@ -12,6 +13,7 @@ export function useLocalVideo(shouldStart: boolean, isCamOn: boolean, isMicOn: b
         stream.getTracks().forEach(track => track.stop());
         setStream(null);
       }
+      setIsReady(false);
       return;
     }
 
@@ -22,10 +24,11 @@ export function useLocalVideo(shouldStart: boolean, isCamOn: boolean, isMicOn: b
         setStream(str);
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = str;
-          localVideoRef.current.muted = true; // prevent feedback
         }
       } catch (err) {
         console.error("Camera access denied or unavailable", err);
+      } finally {
+        setIsReady(true);
       }
     };
     
@@ -45,5 +48,12 @@ export function useLocalVideo(shouldStart: boolean, isCamOn: boolean, isMicOn: b
     }
   }, [stream, isCamOn, isMicOn]);
 
-  return { localVideoRef, localStream: stream, hasVideo: !!stream };
+  useEffect(() => {
+    // Whenever stream is available and the video element is present, make sure it is assigned
+    if (localVideoRef.current && stream && localVideoRef.current.srcObject !== stream) {
+        localVideoRef.current.srcObject = stream;
+    }
+  }, [stream, isReady])
+
+  return { localVideoRef, localStream: stream, hasVideo: !!stream, isReady };
 }

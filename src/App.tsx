@@ -32,14 +32,15 @@ export default function App() {
   const shouldStartMedia = appState !== 'landing' && isVideoMatch;
   const [isCamOn, setIsCamOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
-  const { localVideoRef, localStream, hasVideo } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
+  const { localVideoRef, localStream, hasVideo, isReady: isLocalVideoReady } = useLocalVideo(shouldStartMedia, isCamOn, isMicOn);
   const [showChatPanel, setShowChatPanel] = useState(true);
   
   const [showSafety, setShowSafety] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
   // WebRTC Setup
-  const { remoteVideoRef, hasRemoteVideo } = useWebRTC(isVideoMatch ? activeSessionId : null, localStream);
+  const shouldConnectWebRTC = isVideoMatch ? (isLocalVideoReady ? activeSessionId : null) : null;
+  const { remoteVideoRef, hasRemoteVideo } = useWebRTC(shouldConnectWebRTC, localStream);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -280,7 +281,7 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
-                    className="relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-0"
+                    className={`relative flex-1 bg-black rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 group shadow-2xl min-h-0 ${showChatPanel ? 'h-[55%] sm:h-auto' : 'h-full'}`}
                   >
                     {!hasRemoteVideo ? (
                       <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col items-center justify-center">
@@ -300,7 +301,7 @@ export default function App() {
                     )}
 
                     {/* Overlay Labels */}
-                    <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex gap-2">
+                    <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex gap-2 z-30">
                       <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-2">
                         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></span>
                         LIVE
@@ -310,8 +311,32 @@ export default function App() {
                       </span>
                     </div>
 
+                    {/* PiP Self View Overlay */}
+                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 w-24 sm:w-48 aspect-[3/4] sm:aspect-video bg-slate-900 rounded-xl sm:rounded-2xl overflow-hidden border border-white/20 shadow-2xl z-30">
+                      <div className="absolute inset-0 bg-slate-800 flex items-center justify-center">
+                         {!isCamOn ? (
+                            <VideoOff className="w-6 h-6 text-slate-600" />
+                         ) : (
+                            <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase text-center">Camera...</p>
+                         )}
+                      </div>
+                      <video 
+                        ref={localVideoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
+                      />
+                      <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 px-1.5 py-0.5 bg-black/60 rounded-md text-[8px] sm:text-[9px] font-bold text-white z-10">YOU</div>
+                      {!isMicOn && (
+                         <div className="absolute bottom-1 left-1 sm:bottom-2 sm:left-2 p-0.5 sm:px-2 sm:py-1 bg-red-500/80 rounded-md z-10">
+                           <MicOff className="w-3 h-3 text-white" />
+                         </div>
+                      )}
+                    </div>
+
                     {/* Watermark */}
-                    <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 opacity-10 pointer-events-none">
+                    <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 opacity-10 pointer-events-none z-10">
                       <span className="text-xl sm:text-2xl font-black italic">OMG TV</span>
                     </div>
                     
@@ -336,35 +361,9 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
-                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 min-h-0 ${isVideoMatch ? 'w-full sm:w-80 flex-[0.8] sm:flex-initial sm:h-full' : 'w-full h-full flex-1'}`}
+                    className={`flex flex-col gap-2 sm:gap-6 shrink-0 z-30 min-h-0 ${isVideoMatch ? 'w-full h-[45%] sm:w-80 sm:flex-initial sm:h-full' : 'w-full h-full flex-1'}`}
                   >
                     
-                    {/* Self View - Hidden on mobile, shown on desktop (Only for video match) */}
-                    {isVideoMatch && (
-                        <div className="hidden sm:block aspect-video w-full bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg shrink-0">
-                          <div className="absolute inset-0 bg-slate-800 flex items-center justify-center">
-                             {!isCamOn ? (
-                                <VideoOff className="w-8 h-8 text-slate-600" />
-                             ) : (
-                                <p className="text-[10px] text-slate-500 uppercase">Starting Camera...</p>
-                             )}
-                          </div>
-                          <video 
-                            ref={localVideoRef} 
-                            autoPlay 
-                            playsInline 
-                            muted 
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${hasVideo && isCamOn ? 'opacity-100' : 'opacity-0'}`}
-                          />
-                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded-md text-[9px] font-bold text-white z-10">HD</div>
-                          {!isMicOn && (
-                             <div className="absolute bottom-2 left-2 px-2 py-1 bg-red-500/80 rounded-md z-10">
-                               <MicOff className="w-3 h-3 text-white" />
-                             </div>
-                          )}
-                        </div>
-                    )}
-
                     {/* Chat Messages Area */}
                     <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl sm:rounded-3xl flex flex-col p-3 sm:p-4 backdrop-blur-sm overflow-hidden h-0 shadow-xl">
                       
