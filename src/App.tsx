@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Video, VideoOff, Mic, MicOff, SkipForward, MessageSquare, AlertTriangle, X, Shield, Activity, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,11 @@ import { useLocalVideo } from './hooks/useLocalVideo';
 import { useWebRTC } from './hooks/useWebRTC';
 import { onAuthStateChanged } from 'firebase/auth';
 
-import { SafetyModal } from './components/SafetyModal';
-import { PrivacyModal } from './components/PrivacyModal';
-import { InstallPrompt } from './components/InstallPrompt';
-import { CookieConsent } from './components/CookieConsent';
-import { TermsAgreementModal } from './components/TermsAgreementModal';
+const SafetyModal = lazy(() => import('./components/SafetyModal').then(module => ({ default: module.SafetyModal })));
+const PrivacyModal = lazy(() => import('./components/PrivacyModal').then(module => ({ default: module.PrivacyModal })));
+const InstallPrompt = lazy(() => import('./components/InstallPrompt').then(module => ({ default: module.InstallPrompt })));
+const CookieConsent = lazy(() => import('./components/CookieConsent').then(module => ({ default: module.CookieConsent })));
+const TermsAgreementModal = lazy(() => import('./components/TermsAgreementModal').then(module => ({ default: module.TermsAgreementModal })));
 
 type AppState = 'landing' | 'searching' | 'chat';
 
@@ -159,7 +159,7 @@ export default function App() {
             className="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center justify-center p-6"
           >
             <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
-              <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+              <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" width="40" height="40" fetchPriority="high" decoding="async" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">OMG TV</span>
             </div>
 
@@ -244,7 +244,7 @@ export default function App() {
             className="flex-1 w-full flex flex-col items-center justify-center p-6 relative"
           >
             <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
-              <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+              <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" width="40" height="40" decoding="async" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
               <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">OMG TV</span>
             </div>
 
@@ -296,7 +296,7 @@ export default function App() {
               className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-8 bg-black/40 border-b border-white/5 backdrop-blur-md"
             >
               <div className="flex items-center gap-3">
-                <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+                <img src="https://i.ibb.co.com/rRBpk1rZ/logo.webp" alt="OMG TV Logo" width="40" height="40" decoding="async" className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 hidden sm:block">OMG TV</h1>
               </div>
               <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm font-medium text-slate-400 uppercase tracking-widest items-center">
@@ -506,15 +506,17 @@ export default function App() {
         )}
       </AnimatePresence>
       
-      <SafetyModal isOpen={showSafety} onClose={() => setShowSafety(false)} />
-      <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
-      <InstallPrompt />
-      <CookieConsent />
-      <TermsAgreementModal 
-        isOpen={showTerms} 
-        onAgree={handleTermsAgree} 
-        onClose={() => setShowTerms(false)} 
-      />
+      <Suspense fallback={null}>
+        <SafetyModal isOpen={showSafety} onClose={() => setShowSafety(false)} />
+        <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+        <InstallPrompt />
+        <CookieConsent />
+        <TermsAgreementModal 
+          isOpen={showTerms} 
+          onAgree={handleTermsAgree} 
+          onClose={() => setShowTerms(false)} 
+        />
+      </Suspense>
     </div>
   );
 }
