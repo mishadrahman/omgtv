@@ -35,9 +35,7 @@ service cloud.firestore {
         userId == request.auth.uid &&
         isValidQueueEntry(incoming()) &&
         incoming().uid == request.auth.uid &&
-        incoming().status == 'waiting' &&
-        !('sessionId' in incoming()) &&
-        incoming().createdAt == request.time;
+        incoming().status == 'waiting';
 
       allow update: if isSignedIn() &&
         isValidId(userId) &&

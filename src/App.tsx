@@ -12,6 +12,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { SafetyModal } from './components/SafetyModal';
 import { PrivacyModal } from './components/PrivacyModal';
 import { InstallPrompt } from './components/InstallPrompt';
+import { CookieConsent } from './components/CookieConsent';
+import { TermsAgreementModal } from './components/TermsAgreementModal';
 
 type AppState = 'landing' | 'searching' | 'chat';
 
@@ -37,6 +39,8 @@ export default function App() {
   
   const [showSafety, setShowSafety] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [pendingMatchType, setPendingMatchType] = useState<MatchType | null>(null);
 
   // WebRTC Setup
   const shouldConnectWebRTC = isVideoMatch ? (isLocalVideoReady ? activeSessionId : null) : null;
@@ -96,8 +100,24 @@ export default function App() {
 
   const handleStart = async (type: MatchType) => {
     if (!isAuthReady) return;
+    
+    if (!localStorage.getItem('omgtv_terms_agreed')) {
+      setPendingMatchType(type);
+      setShowTerms(true);
+      return;
+    }
+    
     setCurrentMatchType(type);
     await startSearch(type);
+  };
+
+  const handleTermsAgree = async () => {
+    setShowTerms(false);
+    if (pendingMatchType) {
+      setCurrentMatchType(pendingMatchType);
+      await startSearch(pendingMatchType);
+      setPendingMatchType(null);
+    }
   };
 
   const handleCancelSearch = async () => {
@@ -126,7 +146,7 @@ export default function App() {
   };
 
   return (
-    <div className="fixed inset-0 w-full bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center">
+    <div className="fixed inset-0 w-full bg-[#05070A] text-slate-100 font-sans overflow-hidden flex flex-col items-center select-none">
       <AnimatePresence mode="wait">
         
         {/* Landing Page */}
@@ -489,6 +509,12 @@ export default function App() {
       <SafetyModal isOpen={showSafety} onClose={() => setShowSafety(false)} />
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
       <InstallPrompt />
+      <CookieConsent />
+      <TermsAgreementModal 
+        isOpen={showTerms} 
+        onAgree={handleTermsAgree} 
+        onClose={() => setShowTerms(false)} 
+      />
     </div>
   );
 }
